@@ -1,0 +1,261 @@
+---
+title: "r4ds_wrangle_exercises_14-15"
+author: "Tom Polak"
+date: "October 9, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(stringr)
+library(forcats)
+
+```
+
+
+##14.2.5 Exercises
+
+**1. In code that doesn't use stringr, you'll often see paste() and paste0(). What's the difference between the two functions? What stringr function are they equivalent to? How do the functions differ in their handling of NA?**
+
+  paste() and paste0() both will concatenate different strings together. Paste() uses `sep = " "` as the way to default separate the strings, while paste0() creates a vector with `sep = ""` as the default. A similar function in stringr would be `str_c()`. Paste() coerces the missing value in a string to "NA" a character.   
+
+**2. In your own words, describe the difference between the sep and collapse arguments to str_c().**
+
+  sep will insert whatever value you give it between two different string objects being combined, but if one object has multiple strings in it, then it will not pass the sep character between the two values in that same object. Collapse on the other hand will bring ALL vectors and obejcts into one string, splitting all the differences with whatever value you pass collapse. 
+  
+```{R Chunk - Question 2 14.2.5}
+x <- c("hello","world")
+y <- c("goodbye")
+str_c(x, y)
+str_c(x, y, sep = "::")
+str_c(x, y, collapse = "][")
+str_c(x,y,sep="::",collapse = "][")
+```
+
+**3. Use str_length() and str_sub() to extract the middle character from a string. What will you do if the string has an even number of characters?**
+
+```{R Chunk - Question 3 14.2.5}
+message <- "hello everyone, my name is Olaf and I like warm hugs"
+str_sub(message, start = str_length(message)/2, end = str_length(message)/2)
+```
+
+**4. What does str_wrap() do? When might you want to use it?**
+
+`str_wrap()` is a good way for you to format your output string. You can put the same number of characters in a line with width, indent the text with indent. You might want to use when outputting R Code to a markdown file or some other medium when you want to represent your results to others. 
+
+**5. What does str_trim() do? What's the opposite of str_trim()?**
+
+`str_trim()` will remove all white space from the beginning and end of a string, depending on what you reference in the side argument ("both","left","right"). The opposite is str_pad in the stringr package. 
+
+**6. Write a function that turns (e.g.) a vector c("a", "b", "c") into the string a, b, and c. Think carefully about what it should do if given a vector of length 0, 1, or 2.**
+
+```{R Chunk - Question 6 14.2.5}
+test <- c("a", "b", "c")
+str_c(test)
+str_c(test, collapse="")
+```
+
+##14.3.1.1 Exercises
+
+**1. Explain why each of these strings don't match a \: "\", "\\", "\\\".**
+
+  * `"\"` this character will escape the next one in the R string
+  * `"\\" this string will turn into a \ in the regular expression, which will escape the next character in the regular expression
+  * `"\\\"` the first two will turn into a literal \, then the third one will escape the next character, so it'll escape an escape character
+
+**2. How would you match the sequence `"'\`?**
+
+```{}
+x <-  "\"\'\\"
+str_view(x,"\"\'\\\\")
+```
+  
+**3. What patterns will the regular expression \..\..\.. match? How would you represent it as a string?**
+
+  It will match any patterns that are a dot followed by any character, repeated three times. "Bob is a boss. He also likes the high beam. And he enjoys the shah"
+  
+##14.3.2.1 Exercises
+
+**1. How would you match the literal string `"$^$"`?**
+
+`str_view(c("$^$", "ab$^$sfas"), "^\\$\\^\\$$")`
+
+**2. Given the corpus of common words in `stringr::words`, create regular expressions that find all words that:**
+
+*i) Start with "y".*
+`str_view(words, "^y",match=TRUE)`
+*ii) End with "x"*
+`str_view(words, "x$", match=TRUE)`
+*iii) Are exactly three letters long. (Don't cheat by using str_length()!)*
+`str_view(words, "^...$",match=TRUE)`
+*iv) Have seven letters or more.*
+`str_view(words, "^.......",match=TRUE)`
+    
+Since this list is long, you might want to use the match argument to str_view() to show only the matching or non-matching words.
+
+##14.3.3.1 Exercises
+
+**1. Create regular expressions to find all words that:**
+
+  *i) Start with a vowel.*
+  `str_view(words, "^[a,e,i,o,u]",match=TRUE)`
+  *ii) That only contain consonants. (Hint: thinking about matching "not"-vowels.)*
+  *iii) End with ed, but not with eed.*
+  `str_view(words, "[^e]ed$",match=TRUE)`
+  *iv) End with ing or ise.*
+  `str_view(words, "(ing|ise)$",match=TRUE)`
+
+  
+**2. Empirically verify the rule "i before e except after c".**
+`str_view(words, "ei",match = TRUE)`
+
+**3. Is "q" always followed by a "u"?**
+`str_view(words, "q[^u]",match = TRUE)`
+In the words database it is always followed by a u.
+
+**4. Write a regular expression that matches a word if it's probably written in British English, not American English.**
+`str_view(words, "colour",match = TRUE)`
+
+**5. Create a regular expression that will match telephone numbers as commonly written in your country.**
+`x <- c("(123)-456-7890", "1235-2351")`
+`str_view(x, "\\(\\d\\d\\d\\)-\\d\\d\\d-\\d\\d\\d\\d")`
+
+
+##14.4.2 Exercises
+
+**1. For each of the following challenges, try solving it by using both a single regular expression, and a combination of multiple str_detect() calls.**
+
+*i) Find all words that start or end with x.*
+`words[str_detect(words,"^x|x$")]`
+
+*ii) Find all words that start with a vowel and end with a consonant.*
+`words[str_detect(words,"^[aeiou].*[^aeiou]$")]`
+
+*iii) Are there any words that contain at least one of each different vowel?*
+
+Not in this data set:
+```{R Chunk - Question 4 14.4.2}
+df <- tibble(
+  word = words, 
+  index = seq_along(word)
+)
+
+df %>% 
+  mutate(
+    vowels = str_count(word, "[aeiou]"),
+    a = str_count(word, "a"),
+    e = str_count(word, "e"),
+    i = str_count(word, "i"),
+    o = str_count(word, "o"),
+    u = str_count(word, "u")  
+    ) %>% 
+    filter(a > 0,e > 0, i >0, o > 0, u>0 )
+```
+
+**5. What word has the highest number of vowels? What word has the highest proportion of vowels? (Hint: what is the denominator?)**
+```{R Chunk - Question 5 14.4.2}
+VowelProp <- df %>% 
+  mutate(
+    letters = str_count(word),
+    vowels = str_count(word, "[aeiou]"),
+    vowelP = vowels/letters
+  ) %>% 
+    arrange(desc(vowelP))
+head(VowelProp,1)
+
+VowelCount <- df %>% 
+  mutate(
+    letters = str_count(word),
+    vowels = str_count(word, "[aeiou]"),
+    vowelP = vowels/letters
+  ) %>% 
+  arrange(desc(vowels))
+head(VowelCount,1)
+```
+
+
+##14.4.6.1 Exercises
+
+**1. Split up a string like "apples, pears, and bananas" into individual components.**
+```{}
+x <- "apples, pears, and bananas"
+str_split(x, ", ")
+```
+
+**2. Why is it better to split up by `boundary("word")` than `" "`?**
+
+There may be other characters than just spaces splitting up words, for example "," or "/"
+
+**3. What does splitting with an empty string ("") do? Experiment, and then read the documentation.**
+
+It splits every charater into it's own string. This is because the empty pattern is equivalent to boundary("character")
+
+##15.4.1 Exercises
+
+**1. There are some suspiciously high numbers in tvhours. Is the mean a good summary?**
+
+```{}
+gss_cat %>%
+  filter(!is.na(tvhours)) %>%
+  ggplot(aes(x = tvhours)) +
+  geom_histogram(binwidth = 1)
+```
+
+Nothing stands out in the above histogram, such as a large skew or a lot of outliers. So I would say the mean is a good summary. 
+
+**2. For each factor in gss_cat identify whether the order of the levels is arbitrary or principled.**
+
+There are five categorical variables:
+
+i. `marital` This is arbitrary since it isn't by any sort of observations or alphabetical order
+ii. `race`: This is principled since it is ordered by count of observations
+iii. `rincome`: This is principled since it is ordered by the different income brackets increasing.
+iv. `partyid`: This is arbitrary, no natural ordering
+v. `relig`: This is arbitrary, no natural ordering
+
+**3. Why did moving "Not applicable" to the front of the levels move it to the bottom of the plot?**
+
+Because it gives the level "Not applicable" an integer value of 1. 
+
+##15.5.1 Exercises
+
+**1. How have the proportions of people identifying as Democrat, Republican, and Independent changed over time?**
+
+```{R Chunk - Question 1 15.5.1}
+gss_cat %>% 
+  mutate(partyid = 
+           fct_collapse(partyid,
+                        other = c("No answer", "Don't know", "Other party"),
+                        rep = c("Strong republican", "Not str republican"),
+                        ind = c("Ind,near rep", "Independent", "Ind,near dem"),
+                        dem = c("Not str democrat", "Strong democrat"))) %>%
+  count(year, partyid)  %>%
+  group_by(year) %>%
+  mutate(p = n / sum(n)) %>%
+  ggplot(aes(x = year, y = p,
+             colour = fct_reorder2(partyid, year, p))) +
+  geom_point() +
+  geom_line() +
+  labs(colour = "Party ID.")
+```
+
+As you can see from the above graph, independents/others have increased over the last few years while Republicans/Democrats have seen a steady decrease. 
+
+**2. How could you collapse `rincome` into a small set of categories?**
+
+```{R Chunk - Quesiton 2 15.5.1}
+gss_cat %>%
+  mutate(rincome = 
+           fct_collapse(
+             rincome,
+             `Unknown` = c("No answer", "Don't know", "Refused", "Not applicable"),
+             `Lt $5000` = c("Lt $1000", str_c("$", c("1000", "3000", "4000"),
+                                              " to ", c("2999", "3999", "4999"))),
+             `$5000 to 10000` = str_c("$", c("5000", "6000", "7000", "8000"),
+                                      " to ", c("5999", "6999", "7999", "9999"))
+           )) %>%
+  ggplot(aes(x = rincome)) +
+  geom_bar() + 
+  coord_flip()
+```
