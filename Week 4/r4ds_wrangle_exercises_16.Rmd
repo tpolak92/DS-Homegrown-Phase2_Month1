@@ -1,0 +1,188 @@
+---
+title: "r4ds_wrangle_exercises_16"
+author: "Tom Polak"
+date: "October 18, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(nycflights13)
+library(stringr)
+
+#Set up the flights data for later use in the below questions
+make_datetime_100 <- function(year, month, day, time) {
+  make_datetime(year, month, day, time %/% 100, time %% 100)
+}
+
+flights_dt <- flights %>% 
+  filter(!is.na(dep_time), !is.na(arr_time)) %>% 
+  mutate(
+    dep_time = make_datetime_100(year, month, day, dep_time),
+    arr_time = make_datetime_100(year, month, day, arr_time),
+    sched_dep_time = make_datetime_100(year, month, day, sched_dep_time),
+    sched_arr_time = make_datetime_100(year, month, day, sched_arr_time)
+  ) %>% 
+  select(origin, dest, ends_with("delay"), ends_with("time"))
+
+
+```
+##16.2.4 Exercises
+
+**1. What happens if you parse a string that contains invalid dates?**
+
+  `ymd(c("2010-10-10", "bananas"))`
+  
+  It will return a missing value (NA)
+
+**2. What does the tzone argument to today() do? Why is it important?**
+
+  It will take the current DATE and turn it into a date-time function. This is important if you want all your date variables to be date-time variables in the same timezone. 
+
+**3. Use the appropriate lubridate function to parse each of the following dates:**
+
+```{r setup - Question 3 16.2.4, collapse=TRUE}
+d1 <- "January 1, 2010"
+d2 <- "2015-Mar-07"
+d3 <- "06-Jun-2017"
+d4 <- c("August 19 (2015)", "July 1 (2015)")
+d5 <- "12/30/14" # Dec 30, 2014
+
+mdy(d1)
+ymd(d2)
+dmy(d3)
+mdy(d4)
+mdy(d5)
+
+```
+
+##16.3.4 Exercises
+
+**1. How does the distribution of flight times within a day change over the course of the year?**
+
+```{r chunk - Question 1 16.3.4}
+flights_dt %>%
+  mutate(time = hour(dep_time),
+         month = as.factor(month(dep_time))) %>%
+  ggplot(aes(x = time, group = month, color = month)) +
+  geom_freqpoly(binwidth = 1)
+```
+
+Nothing seems to stand out as being super different as changing over the course of the year. In the winter months, some flights seem to leave more at 11:00AM-12:00PM than in the summer months, but that's the only aberration I can see.  
+
+**2. Compare dep_time, sched_dep_time and dep_delay. Are they consistent? Explain your findings.**
+
+```{r chunk - Question 2 16.3.4}
+flights_dt %>% 
+  mutate(
+        delay_plus_schedtime = sched_dep_time + dep_delay*60,
+        mismatch_flag = ifelse(delay_plus_schedtime != dep_time,1,0)
+        ) %>% 
+  select(sched_dep_time,dep_delay,dep_time,delay_plus_schedtime,mismatch_flag) %>% 
+    group_by(mismatch_flag) %>% 
+      count()
+
+```
+
+As you can see from above, there are 1205 flights where the scheduled departure + departure delay amount did NOT equal the actual departure time. Looking at some examples, this is mostly driven by late night scheduled flights getting delayed into the next day. All-in though, 1205 out of 328,000 flights is less than 1% inconsistency. 
+
+**3. Compare air_time with the duration between the departure and arrival. Explain your findings (Hint: consider the location of the airport.)**
+
+```{r chunk - Quesiton 3 16.3.4}
+flights_dt %>%
+  inner_join(airports, by = c("dest" = "faa")) %>% 
+  mutate(dest_tz = (tz + 5)*-1) %>% 
+  select(origin:air_time,dest_tz) %>% 
+  mutate(
+    diff = arr_time - dep_time + dest_tz*60,
+    taxi_time = diff - air_time
+  ) %>% 
+  filter(taxi_time >= 0)%>% 
+  summarise(taxi_mean = mean(taxi_time, na.rm=TRUE), taxi_median = median(taxi_time,na.rm=TRUE))
+```
+
+Taking into account timezones, there is a difference between air_time and then the duration of the whole flight. This is most likely driven by planes having to taxi to the runway, and then wait in line before it's that planes time to take off. At busy airports like LGA, EWR, and JFK it is not unexpected to have to wait for 30 minutes to wait for your flights turn to take-off. The above data shows on average there is a difference of thirty minutes between flight time and air time.  
+
+**4. How does the average delay time change over the course of a day? Should you use dep_time or sched_dep_time? Why?**
+
+```{r chunk - Question 4 16.3.4}
+flights_dt %>%
+  mutate(sched_dep_hour = hour(sched_dep_time)) %>%
+  group_by(sched_dep_hour) %>%
+  summarise(dep_delay = mean(dep_delay)) %>%
+  ggplot(aes(y = dep_delay, x = sched_dep_hour)) +
+  geom_point() +
+  geom_smooth() +
+  labs(x = "Scheduled Depature Hour", y = "Average Delay (Minutes)")
+```
+
+You should use sched_dep_time as dep_time will skew later in the day (due to the delays). As you can see, the average delay in the morning is not as bad as the average delay as day goes on. Looks like flights scheduled around dinner time (5-7PM) on average are the most delayed.
+
+**5. On what day of the week should you leave if you want to minimise the chance of a delay?**
+
+```{r chunk - Question 5 16.3.4}
+flights_dt %>%
+  mutate(sched_wd = wday(sched_dep_time)) %>%
+  group_by(sched_wd) %>%
+  summarise(dep_delay = mean(dep_delay))
+```
+
+Sunday (day 7) is by far the best day to avoid an average delay.
+
+**6. What makes the distribution of diamonds$carat and flights$sched_dep_time similar?**
+
+It is primarily driven by the human predisposition to create "nice" numbers. So flights will be scheduled at whole numbers (think 3:00PM/3:30PM) versus messy numbers (3:02PM/3:32PM). The same thing is true with carat, humans will round up or down to get the "nice" numbers rather than just keep the ugly number with multiple decimal points. 
+
+**7. Confirm my hypothesis that the early departures of flights in minutes 20-30 and 50-60 are caused by scheduled flights that leave early. Hint: create a binary variable that tells you whether or not a flight was delayed.**
+
+```{r chunk - Question 7 16.3.4}
+flights_dt %>%
+  mutate(early = dep_delay < 0,
+         minute = (minute(sched_dep_time) %/% 10)*10) %>%
+  group_by(minute) %>%
+  summarise(early = mean(early)) %>%
+  ggplot(aes(x = minute, y = early)) +
+  geom_point() + 
+  labs(y="Average Early Departure (Mins)",x="Minute Blocks (20 minutes)")
+```
+
+The above chart more shows if you scheduled in the 0-10 time frame then you're most likely to leave early, while if you're scheduled at the 20-30 minute block then you're most likely to be delayed.
+
+##16.4.5 Exercises
+
+**1. Why is there `months()` but no `dmonths()`?**
+
+Because not all months have the exact same number of seconds. Some months have 30 days versus 31 days.That's why periods work well for months, because it isn't trying to convert to seconds, but is instead telling you how many of that variable there has been..  
+
+**2. Explain days(overnight * 1) to someone who has just started learning R. How does it work?**
+
+overnight is a logical variable that returns TRUE if the arrival time of the flight is BEFORE the depature time. As a logical variable, TRUE also returns 1 so when you multiply TRUE * 1 then it will return 1. The days function then adds on day period to the date. 
+
+**3. Create a vector of dates giving the first day of every month in 2015. Create a vector of dates giving the first day of every month in the current year.**
+
+```{r chunk - Question 3 16.4.5}
+ymd("2015-01-01") + months(0:11)
+
+ymd(str_c(year(today()),"/1/1")) + months(0:11)
+```
+
+**4. Write a function that given your birthday (as a date), returns how old you are in years.**
+
+```{r chunk - Question 4 16.4.5, warning = FALSE}
+age_years <- function(birthday) {
+  (birthday %--% today()) %/% years(1)
+}
+
+age_years(mdy("11/10/13")) #Yep that is the day Frozen came out
+```
+
+**5. Why can't `(today() %--% (today() + years(1)) / months(1)` work?**
+
+So this feels like a trick question, but the above statement works IF you add in the parentheses that is missing. See below: 
+```{r chunk - Question 5 16.4.5} 
+(today() %--% (today() + years(1))) / months(1)
+```
+
+
