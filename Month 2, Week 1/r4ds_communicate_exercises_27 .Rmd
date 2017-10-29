@@ -1,0 +1,154 @@
+---
+title: "Chapter 27 Exercises"
+author: "Tom Polak"
+date: "October 29, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+
+smaller <- diamonds %>% 
+  filter(carat <= 2.5)
+```
+
+## 27.2.1 Exercises
+
+**1. Create a new notebook using File > New File > R Notebook. Read the instructions. Practice running the chunks. Verify that you can modify the code, re-run it, and see modified output.**
+
+Completed
+
+**2. Create a new R Markdown document with File > New File > R Markdown. Knit it by clicking the appropriate button. Knit it by using the appropriate keyboard short cut. Verify that you can modify the input and see the output update.**
+
+Completed
+
+**3. Compare and contrast the R notebook and R markdown files you created above. How are the outputs similar? How are they different? How are the inputs similar? How are they different? What happens if you copy the YAML header from one to the other?**
+
+R notebook files show the output inside the editor, while hiding the console. R markdown files shows the output inside the console, and does not show output inside the editor. 
+
+**4. Create one new R Markdown document for each of the three built-in formats: HTML, PDF and Word. Knit each of the three documents. How does the output differ? How does the input differ? (You may need to install LaTeX in order to build the PDF output - RStudio will prompt you if this is necessary.)**
+
+Completed
+
+
+## 27.3.1 Exercises
+
+**1. Practice what you've learned by creating a brief CV. The title should be your name, and you should include headings for (at least) education or employment. Each of the sections should include a bulleted list of jobs/degrees. Highlight the year in bold.**
+
+***
+# Olaf resume
+
+##Education:
+
+* *B.A.* - Magical snowy object creation 
+* *Masters* - How to ignore the laws of phsyics
+
+##Work History:
+* Many magical adventures **2 years**
+* Reindeer translator **2 years**
+* Travel reporter **4 years**
+
+***
+
+
+**2. Using the R Markdown quick reference, figure out how to:**
+
+  *i) Add a footnote.*
+  
+It's dissapointing how poorly my fantasy football team has done"[^1]
+
+[^1]: reference my team in the data science league
+      
+  *ii) Add a horizontal rule.*
+
+  
+End of SAT: Part 1
+
+***
+
+Beginning of SAT: Part 2 - Good luck students
+
+
+  *iii) Add a block quote.*
+  
+> "Some people are worth melting for." - Olaf the Snowman
+
+**3. Copy and paste the contents of diamond-sizes.Rmd from https://github.com/hadley/r4ds/tree/master/rmarkdown in to a local R markdown document. Check that you can run it, then add text after the frequency polygon that describes its most striking features.**
+
+Completed
+
+## 27.4.7 Exercises
+
+**1. Add a section that explores how diamond sizes vary by cut, colour, and clarity. Assume you're writing a report for someone who doesn't know R, and instead of setting echo = FALSE on each chunk, set a global option.**
+
+```{r 27.4.7 Chunk - Question 1}
+knitr::opts_chunk$set(
+  echo = FALSE
+)
+```
+
+Only showing the above code, to let the user know the global option being set. 
+
+```{r 27.4.7 Chunk - Question 1 Graph 1}
+diamonds %>% 
+  ggplot(aes(cut,carat)) +
+  geom_boxplot()
+```
+
+
+```{r 27.4.7 Chunk - Question 1 Graph 2}
+diamonds %>% 
+  ggplot(aes(color,carat)) +
+  geom_boxplot()    
+```
+
+```{r 27.4.7_Chunk_Q1_Graph3}
+diamonds %>% 
+  ggplot(aes(clarity,carat)) +
+  geom_boxplot()
+
+```
+
+
+**2. Download diamond-sizes.Rmd from https://github.com/hadley/r4ds/tree/master/rmarkdown. Add a section that describes the largest 20 diamonds, including a table that displays their most important attributes.**
+
+Completed
+
+**3. Modify diamonds-sizes.Rmd to use comma() to produce nicely formatted output. Also include the percentage of diamonds that are larger than 2.5 carats.**
+
+Completed
+
+**4. Set up a network of chunks where d depends on c and b, and both b and c depend on a. Have each chunk print lubridate::now(), set cache = TRUE, then verify your understanding of caching.**
+
+```{r 27.4.7_Chunk_Q1_A, echo=TRUE}
+smaller <- diamonds %>% 
+  filter(carat <= 2.5)
+lubridate::now()
+```
+
+```{r 27.4.7_Chunk_Q1_B, echo=TRUE}
+smaller <- smaller %>% 
+  mutate(cheap = price < 350)
+lubridate::now()
+```
+
+```{r 27.4.7_Chunk_Q1_C, echo=TRUE}
+smaller <- smaller %>% 
+  mutate(expensive = price >17000) 
+lubridate::now()
+```
+
+```{r 27.4.7_Chunk_Q1_D, echo=TRUE}
+smaller %>% 
+  summarise(
+    avgPrice = mean(price),
+    cheapCount = sum(cheap),
+    expensiveCount = sum(expensive)
+  )
+lubridate::now()
+```
+
+Caching works.
