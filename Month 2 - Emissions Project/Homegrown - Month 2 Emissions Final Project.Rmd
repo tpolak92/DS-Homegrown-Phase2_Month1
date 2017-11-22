@@ -1,0 +1,234 @@
+---
+title: "Coursera Project - PM2.5 Emissions Data"
+author: "Tom Polak"
+date: "November 21, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE, cache = TRUE}
+knitr::opts_knit$set(root.dir = "./Emissions Data")
+
+# Load in the necessary library's
+library(tidyverse)
+
+# Create a mapping for later on when we split Baltimore and LA
+fipsToCity <- data.frame(
+  fips = c('24510','06037'), city = c('Baltimore','LA')
+)
+
+# Pull in the two emissions data sets
+NEI <- readRDS("./Emissions Data/summarySCC_PM25.RDS")
+SCC <- readRDS("./Emissions Data/Source_Classification_Code.RDS")
+
+# Create the final dataset
+temp <- merge(NEI,SCC,by = "SCC")
+PMData <- merge(temp, fipsToCity, by = "fips", all.x = TRUE)
+
+```
+
+# Emissions Data Plot Analysis
+
+This analysis is generated from the National Emissions Inventory (NEI) dataset between 1999-2008. Specifically the dataset has all PM2.5 pollutants from a variety of different sources throughout the United States. 
+
+In order to better understand the trends over time of the amount of PM2.5 pollutant, 6 questions were posed. The plots below are an attempt to measure/identify the relationship posed. 
+
+## Question 1
+
+Have total emissions from PM2.5 decreased in the United States from 1999 to 2008? Using the **base** plotting system, make a plot showing the *total* PM2.5 emission from all sources for each of the years 1999, 2002, 2005, and 2008.
+
+```{r chunk - Question 1, cache=TRUE}
+# Question 1
+EmissionsSummary_Total <- PMData %>% 
+  group_by(year) %>% 
+  summarise(TotalEmissions = sum(Emissions)/1000,
+            AvgEmissions = mean(Emissions))
+
+modelTotal <- lm(TotalEmissions ~ year,EmissionsSummary_Total)
+modelTotalEquation <- paste('Equation of LM:\n Emissions(Y) =', format(coef(modelTotal)[[2]],nsmall =1, digits = 1,big.mark = ","), '* year(x)', '+', format(coef(modelTotal)[[1]],nsmall =1, digits = 2, big.mark = ","))
+
+par(mar=c(5,4,4,2)+0.1)
+with(EmissionsSummary_Total, 
+     plot(year,TotalEmissions, 
+          ylim = c(min(TotalEmissions)*0.95,max(TotalEmissions)*1.05),
+          xaxt = "n",
+          main = "Total PM2.5 Emissions from 1999-2008", 
+          xlab = "Years (1999-2008)", 
+          ylab= "Total PM2.5 Emisisons (kilotons)", 
+          pch = 20
+     )
+)
+axis(1, at = EmissionsSummary_Total$year)
+text(EmissionsSummary_Total$year,EmissionsSummary_Total$TotalEmissions, 
+     labels= paste(format(EmissionsSummary_Total$TotalEmissions,nsmall =1, digits = 1,big.mark = ","),"(kt)"), 
+     cex = .65,
+     pos = 3
+)
+abline(modelTotal, lwd = 1, lty = "dashed", col = "blue")
+text(min(EmissionsSummary_Total$year),mean(EmissionsSummary_Total$TotalEmissions),
+     labels = modelTotalEquation,
+     cex = .75,
+     pos = 4,
+     col = "blue"
+)
+```
+
+
+## Question 2
+Have total emissions from PM2.5 decreased in the **Baltimore City**, Maryland (fips == "24510") from 1999 to 2008? Use the **base** plotting system to make a plot answering this question.
+
+```{r chunk - Question 2,cache=TRUE}
+EmissionsSummary_Baltimore <- PMData %>% 
+  filter(fips == "24510") %>% 
+  group_by(year) %>% 
+  summarise(TotalEmissions = sum(Emissions)/1000,
+            AvgEmissions = mean(Emissions))
+
+modelBal <- lm(TotalEmissions ~ year,EmissionsSummary_Baltimore)
+modelBalEquation <- paste('Equation of LM:\n Emissions(Y) =', format(coef(modelBal)[[2]],nsmall =1, digits = 1,big.mark = ","), '* year(x)', '+', format(coef(modelBal)[[1]],nsmall =1, digits = 2, big.mark = ","))
+
+par(mar=c(5,4,4,2)+0.1)
+with(EmissionsSummary_Baltimore, 
+     plot(year,TotalEmissions, 
+          ylim = c(min(TotalEmissions)*0.95,max(TotalEmissions)*1.05),
+          xaxt = "n",
+          main = "Baltimore Total PM2.5 Emissions from 1999-2008", 
+          xlab = "Years (1999-2008)", 
+          ylab= "Total PM2.5 Emisisons (kilotons)", 
+          pch = 20
+     )
+)
+axis(1, at = EmissionsSummary_Total$year)
+text(EmissionsSummary_Baltimore$year,EmissionsSummary_Baltimore$TotalEmissions, 
+     labels= paste(format(EmissionsSummary_Baltimore$TotalEmissions,nsmall =1, digits = 1,big.mark = ","),"(kt)"), 
+     cex = .65,
+     pos = 3
+)
+abline(modelBal, lwd = 1, lty = "dashed", col = "blue")
+text(min(EmissionsSummary_Baltimore$year),mean(EmissionsSummary_Baltimore$TotalEmissions),
+     labels = modelBalEquation,
+     cex = .75,
+     pos = 4,
+     col = "blue"
+)
+```
+
+## Question 3
+Of the four types of sources indicated by the **type** (point, nonpoint, onroad, nonroad) variable, which of these four sources have seen decreases in emissions from 1999-2008 for **Baltimore City**? Which have seen increases in emissions from 1999-2008? Use the **ggplot2** plotting system to make a plot answer this question.
+
+```{r chunk - Question 3,cache=TRUE}
+EmissionsSummary_Baltimore_Type <- PMData %>% 
+  filter(fips == "24510") %>% 
+  group_by(year, type) %>% 
+  summarise(TotalEmissions = sum(Emissions)/1000,
+            AvgEmissions = mean(Emissions))
+
+ggplot(EmissionsSummary_Baltimore_Type, aes(year,TotalEmissions,col=type)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~type,nrow=4) +
+  labs(title = "Baltimore PM2.5 Emissions from 1999-2008", 
+       subtitle = "Broken out by Emission Source",
+       x = "Years (1999-2008)", 
+       y = "Total PM2.5 Emisisons (kilotons)",
+       color = "Emission Source"
+  )
+```
+
+## Question 4
+Across the United States, how have emissions from coal combustion-related sources changed from 1999-2008?
+
+```{r chunk - Question 4,cache=TRUE}
+EmissionsSummary_Coal <- PMData %>% 
+  filter(grepl("Coal",SCC.Level.Three) == TRUE) %>% 
+  group_by(year) %>% 
+  summarise(TotalEmissions = sum(Emissions)/1000,
+            AvgEmissions = mean(Emissions))
+
+modelCoal <- lm(TotalEmissions ~ year,EmissionsSummary_Coal)
+modelCoalEquation <- paste('Equation of LM:\n Emissions(Y) =', format(coef(modelCoal)[[2]],nsmall =1, digits = 1,big.mark = ","), '* year(x)', '+', format(coef(modelCoal)[[1]],nsmall =1, digits = 2, big.mark = ","))
+
+par(mar=c(5,4,4,2)+0.1)
+with(EmissionsSummary_Coal, 
+     plot(year,TotalEmissions, 
+          ylim = c(min(TotalEmissions)*0.95,max(TotalEmissions)*1.05),
+          xaxt = "n",
+          main = "Total PM2.5 Emissions from 1999-2008 \n Coal combustion-related sources", 
+          xlab = "Years (1999-2008)", 
+          ylab= "Total PM2.5 Emisisons (kilotons)", 
+          pch = 20
+     )
+)
+axis(1, at = EmissionsSummary_Coal$year)
+text(EmissionsSummary_Coal$year,EmissionsSummary_Coal$TotalEmissions, 
+     labels= paste(format(EmissionsSummary_Coal$TotalEmissions,nsmall =1, digits = 1,big.mark = ","),"(kt)"), 
+     cex = .65,
+     pos = 3
+)
+abline(modelCoal, lwd = 1, lty = "dashed", col = "blue")
+text(min(EmissionsSummary_Coal$year),mean(EmissionsSummary_Coal$TotalEmissions),
+     labels = modelCoalEquation,
+     cex = .75,
+     pos = 4,
+     col = "blue"
+)
+```
+
+## Question 5
+How have emissions from motor vehicle sources changed from 1999-2008 in **Baltimore City**?
+
+```{r chunk - Question 5,cache=TRUE}
+EmissionsSummary_MotorSources_Bal <- PMData %>% 
+  filter((grepl("Vehicle",SCC.Level.Two) == TRUE),fips == "24510") %>% 
+  group_by(year, SCC.Level.Two) %>% 
+  summarise(TotalEmissions = sum(Emissions),
+            AvgEmissions = mean(Emissions)) %>% 
+  rename(Emission_Sources = SCC.Level.Two)
+
+ggplot(EmissionsSummary_MotorSources_Bal, aes(year,TotalEmissions, col = Emission_Sources)) +
+  geom_point() +
+  facet_wrap(~Emission_Sources,ncol=5,labeller = label_wrap_gen()) +
+  scale_x_continuous(breaks = EmissionsSummary_MotorSources_Bal$year) +
+  geom_smooth(method= 'lm', se = FALSE) +
+  labs(title = "Baltimore PM2.5 Emissions from 1999-2008", 
+       subtitle = "From motor vehicle combustion-related Sources",
+       x = "Years (1999-2008)", 
+       y = "Total PM2.5 Emisisons (tons)"
+  ) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle=45),
+        panel.spacing = unit(1, "lines"),
+        plot.margin = unit(c(1,1,1,1),"cm")
+        ) +
+  guides(col=guide_legend(title="Emissions Sources",title.position = "top",nrow=2))
+```
+
+## Question 6
+Compare emissions from motor vehicle sources in **Baltimore City** with emissions from motor vehicle sources in **Los Angeles County**, California (fips == "06037"). Which city has seen greater changes over time in motor vehicle emissions?
+
+```{r chunk - Question 6,cache=TRUE}
+EmissionsSummary_MotorSources_Bal_LA <- PMData %>% 
+  filter((grepl("Vehicle",SCC.Level.Two) == TRUE),fips %in% c("24510","06037")) %>% 
+  group_by(year,city, SCC.Level.Two) %>% 
+  rename(Emission_Sources = SCC.Level.Two) %>% 
+  summarise(TotalEmissions = sum(Emissions),
+            AvgEmissions = mean(Emissions))
+
+ggplot(EmissionsSummary_MotorSources_Bal_LA, aes(year,TotalEmissions, col = Emission_Sources)) +
+  geom_point() +
+  facet_wrap(city~Emission_Sources,ncol=5, nrow = 2,labeller = label_wrap_gen()) +
+  geom_smooth(method= 'lm', se = FALSE) +
+  scale_x_continuous(breaks = EmissionsSummary_MotorSources_Bal$year) +
+  labs(title = "Total PM2.5 Emissions from 1999-2008", 
+       subtitle = "Motor Vehicle Sources Combustion-Related Sources in Baltimore vs. Los Angeles (LA)",
+       x = "Years (1999-2008)", 
+       y = "Total PM2.5 Emisisons (tons)",
+       fill = "Motor Vehicle Source"
+  ) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle=45),
+        panel.spacing = unit(1, "lines"),
+        plot.margin = unit(c(0.5,1,0.5,0.5),"cm")
+  ) +
+  guides(col=guide_legend(title="Emissions Sources",title.position = "top",nrow=2))
+```
+
