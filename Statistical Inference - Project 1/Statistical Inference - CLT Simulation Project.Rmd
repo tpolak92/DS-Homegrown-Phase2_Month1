@@ -1,0 +1,102 @@
+---
+title: "Statistical Inference - CLT Simulation Project"
+author: "Tom Polak"
+date: "December 12, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+
+```
+
+
+## Overview
+This project will investigate the exponential distribution in R and compare it with the Central Limit Theorem. For this analysis, a rate parameter of 0.2 will be set for all simulations. The analysis will then compare the distribution of averages of 40 exponentials over 1000 simulations. 
+
+
+## Simulations
+
+Set the lambda, exponentials, and number of simulations (n)
+
+```{r Simulations SetUp Chunk, results= 'hide'}
+lambda = 0.2
+exponentials = 40
+n = 1000
+```
+
+Run the simulation with the set variables
+
+```{r Simulations Execute Chunk, results= 'hide'}
+simMeans = NULL
+for(i in 1:n) simMeans = c(simMeans, mean(rexp(exponentials,lambda)))
+```
+
+## Sample Mean vs Theoretical Mean
+
+### Theoretical Mean
+
+We know the theoretical mean is 1/lambda
+
+```{r SampleMean - Theoretical Mean}
+1/lambda
+```
+
+### Sample Mean
+
+Calculating the sample mean from the simulations we ran earlier
+```{r SampleMean - Sample Mean}
+mean(simMeans)
+```
+
+### Comparison
+
+```{r SampleMean - Compare the Sample and Theoretical}
+abs(mean(simMeans) - 1/lambda)
+```
+
+There is only a slight difference between the theoretical mean and the sample mean created from the 1000 simulations of 40 exponentials. Next we'll take a look at the variance. 
+
+## Sample Variance vs Theoretical Variance
+
+### Theoretical Variance
+
+The standard deviation of an exponential distribution is 1/lambda. Since the standard deviation is the square root of the variance, we can calculate the variance as (1/lambda)^2
+
+```{r Variance - Theoretical Variance}
+(1/(lambda*sqrt(exponentials)))^2
+```
+
+### Sample Variance
+
+Calculating the sample variance from the simulations we ran earlier
+
+```{r Variance - Sample Variance}
+var(simMeans)
+```
+
+### Comparison
+
+```{r Variance - Comparison}
+abs(var(simMeans)-(1/(lambda*sqrt(exponentials)))^2)
+```
+
+There is only a slight difference between the theoretical variance and the sample variance.
+
+## Distribution
+
+Below is a density histogram plot of the 1000 simulations. The normal distribution (black curve) is overlaid on the simulation data (blue histograms).
+
+``` {r Distribution - Plot}
+ggplot(data.frame(simMeans), aes(x=simMeans)) +
+  geom_histogram(aes(y=..density..), binwidth = 0.2, color = "black", fill = "light blue") +
+  stat_function(fun=dnorm, args = list(mean = lambda^-1, sd=(lambda*sqrt(exponentials))^-1),size=2) +
+  labs(
+      title = "Plot of The Simulations", 
+      x = "Simulation Mean",
+      y = "Density"
+  )
+```
+
+

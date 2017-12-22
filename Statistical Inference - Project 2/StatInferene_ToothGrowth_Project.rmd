@@ -1,0 +1,111 @@
+---
+title: "StatInference_ToothGrowth_Project"
+author: "Tom Polak"
+date: "December 20, 2017"
+output:
+  html_document:
+    keep_md: yes
+  pdf_document: default
+---
+
+```{r global_options, include=FALSE}
+library(knitr)
+opts_chunk$set(fig.width=10, fig.height=8, warning=FALSE, message=FALSE)
+```
+
+# Statistical Inference Course Project 2
+
+## Overview
+Load the ToothGrowth data and perform some basic exploratory data analyses 
+- Provide a basic summary of the data.
+- Use confidence intervals and/or hypothesis tests to compare tooth growth by supp and dose. (Only use the techniques from class, even if there's other approaches worth considering)
+- State your conclusions and the assumptions needed for your conclusions. 
+
+
+## Load Data
+
+```{r}
+# load neccesary libraries
+library(ggplot2)
+library(gridExtra)
+
+# The Effect of Vitamin C on Tooth Growth in Guinea Pigs
+data(ToothGrowth)
+toothGrowth <- ToothGrowth 
+toothGrowth$dose <- as.factor(toothGrowth$dose) # convert to factor
+```
+
+
+## Basic Summary of the data
+```{r}
+str(toothGrowth)
+summary(toothGrowth)
+head(toothGrowth)
+
+table(toothGrowth$supp, toothGrowth$dose)
+```
+
+```{r echo=FALSE}
+p1 <- ggplot(data=toothGrowth, aes(x=dose,y=len,fill=dose)) +
+  geom_boxplot() + 
+  theme(legend.position="none") + 
+  facet_grid(.~supp) 
+
+p2 <- ggplot(data=toothGrowth, aes(x=supp,y=len,fill=supp)) +
+  geom_boxplot() + 
+  theme(legend.position="none") + 
+  facet_grid(.~dose) 
+
+p3 <- ggplot(data=toothGrowth, aes(x=supp,y=len,fill=supp)) +
+  geom_boxplot()
+
+p4 <- ggplot(data=toothGrowth, aes(x=dose,y=len,fill=dose)) +
+  geom_boxplot()
+
+grid.arrange(p1, p4, p2, p3, ncol = 2, nrow=2)
+
+#ggpairs(toothGrowth, 
+#        upper = list(continuous = "density", combo = "box"),
+#        lower = list(continuous="smooth"),        
+#        colour = "dose",
+#        axisLabels='show')
+```
+
+
+Now we will run a t-test on the length of tooth and the supplement to see if there is any impact of delivery method.
+
+```{r}
+# run t-test
+t.test(len~supp,data=toothGrowth)
+```
+
+With a p-value of 0.06 and the 95% confidence interval containing 0, we cannot reject the null hypotheses. It would seem the delivery method of vitaman C has no impact on the length of tooth.
+
+Next thing to look at is the impact to length based on the amount of Vitamin C they received (dose variable). To measure this, the three tests were run to compare the three different dosages to each other. 
+
+```{r}
+# run t-test using dose amounts 0.5 and 1.0
+toothGrowth_sub <- subset(toothGrowth, toothGrowth$dose %in% c(1.0,0.5))
+t.test(len~dose,data=toothGrowth_sub)
+
+# run t-test using dose amounts 0.5 and 2.0
+toothGrowth_sub <- subset(toothGrowth, toothGrowth$dose %in% c(0.5,2.0))
+t.test(len~dose,data=toothGrowth_sub)
+
+# run t-test using dose amounts 1.0 and 2.0
+toothGrowth_sub <- subset(toothGrowth, toothGrowth$dose %in% c(1.0,2.0))
+t.test(len~dose,data=toothGrowth_sub)
+```
+
+As can be seen above, all three t-tests have a VERY small P-Value and none of the confidence intervals contain zero. 
+
+Based on this result we can assume that the average tooth length increases with an inceasing dose, and therefore the null hypothesis can be rejected.
+
+## Conclusions
+
+Given the following assumptions:
+
+* The sample is representative of the population
+* The distribution of the sample means follows the Central Limit Theorem
+
+In reviewing our t-test analysis from above, we can conclude that supplement delivery method has no effect on tooth growth/length, however increased dosages do result in increased tooth length.

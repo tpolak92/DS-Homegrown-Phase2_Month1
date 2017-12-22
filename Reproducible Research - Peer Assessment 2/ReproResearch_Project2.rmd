@@ -1,0 +1,215 @@
+---
+title: "Reproducible Research Peer Assessment - Storm Data"
+author: "Tom Polak"
+date: "December 18, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+## 1. Synopsis
+
+The National Oceanic and Atmospheric Administration (NOAA) maintains a public database for storm events. The data contains the type of storm event, details like location, date, estimates for damage to property as well as the number of human victims of the storm. In this report we investigate which type of events are the most harmful to the population and financially.
+
+The conclusion is that the impact on humans, be it injuries or fatalities, isn't directly correlated to the ecomomic damage weather events cause. Tornado's are by far the highest cause for injuries and fatalities, yet rank third in economic damages. While Flooding & High Surf and Wind & Storm, cover more than 80% of all economic cost but aren't the biggest events in Injuries/Fatalities. 
+
+------
+
+## 2. Data Processing
+
+2.1 First need to library the right packages
+
+```{r, warning=FALSE,message=FALSE}
+library(tidyverse)
+library(ggplot2)
+
+library(grid) # Will use for two grids later
+library(gridExtra) # for advanced plots
+
+```
+
+2.2 Load the raw dataset
+
+```{r - Load data, cache=TRUE}
+# Pull in the necessary tables
+
+StormCSV <- read.csv(bzfile("StormData.csv.bz2"))
+```
+
+2.3 Tidy the raw data
+
+```{r, warning=FALSE}
+NecessaryColumns <- c('EVTYPE', 'FATALITIES', 'INJURIES', 'PROPDMG', 'PROPDMGEXP', 'CROPDMG', 'CROPDMGEXP')
+
+# Keep only the necessary columns
+StormData <- StormCSV[ , NecessaryColumns]
+
+# Transforms the property damage and corp damage variables into absolute values
+cleanStormData <- StormData %>% 
+  mutate(
+      propDamage = PROPDMG * 10^case_when(
+        grepl("h",PROPDMGEXP,ignore.case=TRUE) ~ 2,
+        grepl("k",PROPDMGEXP,ignore.case=TRUE) ~ 3,
+        grepl("m",PROPDMGEXP,ignore.case=TRUE) ~ 6,
+        grepl("b",PROPDMGEXP,ignore.case=TRUE) ~ 9,
+        TRUE ~ 0
+        ),
+      cropDamage = CROPDMG * 10^case_when(
+        grepl("h",CROPDMGEXP,ignore.case=TRUE) ~ 2,
+        grepl("k",CROPDMGEXP,ignore.case=TRUE) ~ 3,
+        grepl("m",CROPDMGEXP,ignore.case=TRUE) ~ 6,
+        grepl("b",CROPDMGEXP,ignore.case=TRUE) ~ 9,
+        TRUE ~ 0
+        ),
+      totalDamage = propDamage + cropDamage,
+      damageSource = NA
+      )
+
+# Combines the EVTYPE column into 11 different categories for damageSource
+cleanStormData[grepl("precipitation|rain|hail|drizzle|wet|percip|burst|depression|fog|wall cloud", 
+                       cleanStormData$EVTYPE, ignore.case = TRUE), "damageSource"] <- "Precipitation & Fog"
+cleanStormData[grepl("wind|storm|wnd|hurricane|typhoon", 
+                       cleanStormData$EVTYPE, ignore.case = TRUE), "damageSource"] <- "Wind & Storm"
+cleanStormData[grepl("slide|erosion|slump", 
+                       cleanStormData$EVTYPE, ignore.case = TRUE), "damageSource"] <- "Landslide & Erosion"
+cleanStormData[grepl("warmth|warm|heat|dry|hot|drought|thermia|temperature record|record temperature|record high", 
+                       cleanStormData$EVTYPE, ignore.case = TRUE), "damageSource"] <- "Heat & Drought"
+cleanStormData[grepl("cold|cool|ice|icy|frost|freeze|snow|winter|wintry|wintery|blizzard|chill|freezing|avalanche|glaze|sleet", 
+                       cleanStormData$EVTYPE, ignore.case = TRUE), "damageSource"] <- "Snow & Ice"
+cleanStormData[grepl("flood|surf|blow-out|swells|fld|dam break", 
+                       cleanStormData$EVTYPE, ignore.case = TRUE), "damageSource"] <- "Flooding & High Surf"
+cleanStormData[grepl("seas|high water|tide|tsunami|wave|current|marine|drowning", 
+                       cleanStormData$EVTYPE, ignore.case = TRUE), "damageSource"] <- "High seas"
+cleanStormData[grepl("dust|saharan", 
+                       cleanStormData$EVTYPE, ignore.case = TRUE), "damageSource"] <- "Dust & Saharan winds"  
+cleanStormData[grepl("tstm|thunderstorm|lightning", 
+                       cleanStormData$EVTYPE, ignore.case = TRUE), "damageSource"] <- "Thunderstorm & Lightning"
+cleanStormData[grepl("tornado|spout|funnel|whirlwind", 
+                       cleanStormData$EVTYPE, ignore.case = TRUE), "damageSource"] <- "Tornado"
+cleanStormData[grepl("fire|smoke|volcanic", 
+                       cleanStormData$EVTYPE, ignore.case = TRUE), "damageSource"] <- "Fire & Volcanic activity"
+```
+
+------
+
+## 3. Results
+
+### 3.1 Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+
+First we need to create the summary dataset by damage source, a variable that buckets the different EVTYPE variables into 11 "sources".
+
+```{r}
+# create the summary table for this question
+summaryPopHealth <- cleanStormData %>% 
+  filter(!is.na(damageSource)) %>% 
+  group_by(damageSource) %>% 
+    summarise(totalInjuries = sum(INJURIES),
+              totalDeaths = sum(FATALITIES)
+              ) %>% 
+  arrange(desc(totalInjuries))
+```
+
+
+Compared both injuries and fatalities within the same graph to help answer this question. As you can see, far and away Tornado's are the biggest hazard to populatoin health. they not only kill the most (right graph) they also cause the most injuries. Intrestingly is how close High seas fatalities are with injuries, indicating you have a low likelihood to survive if you get into trouble. 
+
+
+``` {r}
+# define max values for bar chart scale
+maxInjuries <- max(summaryPopHealth$totalInjuries)
+maxInjuries <- maxInjuries + round(maxInjuries * 0.25)
+
+maxFatalities <- max(summaryPopHealth$totalDeaths)
+maxFatalities <- maxFatalities + round(maxFatalities * 0.25)  
+
+# add middle column with just damageSource labels
+g.mid <- ggplot(data=summaryPopHealth, aes(x=1,y=reorder(damageSource,totalInjuries))) +
+  geom_text(aes(label=damageSource), size=4) +
+  ggtitle("") +
+  ylab(NULL) +
+  scale_x_continuous(expand=c(0,0),limits=c(0.94,1.065)) +
+  theme(axis.title=element_blank(),
+        panel.grid=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        panel.background=element_blank(),
+        axis.text.x=element_text(color=NA),
+        axis.ticks.x=element_line(color=NA),
+        plot.margin = unit(c(1,-1,1,-1), "mm"))
+
+# add left chart with injuries
+g.injuries <- ggplot(data=summaryPopHealth, aes(x=reorder(damageSource, totalInjuries), y=totalInjuries)) +
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label=totalInjuries), size=3, vjust=0.5, hjust=2.0) +
+  ggtitle("Injuries") +
+  scale_y_reverse(expand=c(0, 0), limits=c(maxInjuries,0)) + 
+  coord_flip() +
+  theme(axis.title.x = element_blank(), 
+        axis.title.y = element_blank(), 
+        axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank(), 
+        plot.margin = unit(c(1,-1,1,0), "mm")) 
+
+# add right chart with fatalities
+g.fatalities <- ggplot(data=summaryPopHealth, aes(x= reorder(damageSource, totalInjuries), y=totalDeaths)) +
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label=totalDeaths), size=3, vjust=0.5, hjust=-1.0) +
+  ggtitle("Fatalities") +
+  scale_y_continuous(expand=c(0, 0), limits=c(0,maxFatalities)) + 
+  coord_flip() +
+  theme(axis.title.x = element_blank(), 
+        axis.title.y = element_blank(), 
+        axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank(), 
+        plot.margin = unit(c(1,0,1,-1), "mm")) 
+
+# combine charts in one plot
+gg.injuries <- ggplot_gtable(ggplot_build(g.injuries))
+gg.fatalities <- ggplot_gtable(ggplot_build(g.fatalities))
+gg.mid <- ggplot_gtable(ggplot_build(g.mid))
+
+grid.arrange(gg.injuries,gg.mid,gg.fatalities, ncol=3,widths=c(0.4,0.3,0.4))
+
+
+```
+
+The underlying data
+
+``` {r}
+summaryPopHealth
+```
+
+
+
+### 3.2 Across the United States, which types of events have the greatest economic consequences?
+
+First need to create the summary dataset. 
+
+``` {r}
+summaryDamage <- cleanStormData %>% 
+  filter(!is.na(damageSource)) %>% 
+  group_by(damageSource) %>% 
+  summarise(totalDamage = sum(totalDamage)
+  ) %>% 
+  arrange(desc(totalDamage))
+```
+
+Crop damage is hardly a factor in comparission to the total economic cost. The real interesting weather events are Wind & Storm and Flooding & High Surf, since together these cover more than 80% of the economic damage. While tornado's have claimed the most lives (per the earlier chart), they don't cause anywhere near as much damage as the first two. 
+
+``` {r}
+ggplot(summaryDamage, aes(x=reorder(damageSource,-totalDamage), y=totalDamage/1000000)) + 
+  geom_bar(stat = "identity") +
+  xlab("Event Type") +
+  theme(axis.text.x = element_text(angle = 45, size=8, hjust = 1, vjust = 1)) +
+  ylab("Total Damage (millions of USD)") +
+  ggtitle("Aggregated property and crop damage for weather events")
+
+```
+
+The underlying data
+
+``` {r}
+summaryDamage
+```
